@@ -1,5 +1,7 @@
 #!/usr/bin/env php
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 $dir = '/bin/coronawatch_data';
 $cache = json_decode(file_get_contents($dir . '/cache.json'), true);
@@ -20,27 +22,35 @@ curl_setopt_array($curl, [
         ],
 ]);
 
-$response = curl_exec($curl);
-
-$data = json_decode($response, true);
-$today = str_replace('+', '', $data['response'][0]['cases']['new']);
-if($today == 0){
-        echo ("ERR: No data for today yet");
-} else {
-        $rec = (($cache['record'] < $today) ? $today : $cache['record']);
-        $def = array("today" => $today, "record" => $rec, "date" => date("m/d/y"));
-        $dif = ($today - $cache['today']);
-        if(in_array('-t', $argv)){
-                $ret = '[CW]: *\\+' . $today . '* \\> *' . $dif . '*, R: *' . $cache['record'$
-                $swret = '[CW]: +' . $today . ' \(' . $dif . '\) R: ' . $cache['record'];
-                shell_exec('telegrambotreport -m "' . $ret . '"');
-                shell_exec('sudo send -NSA-'. $swret);
+$attempt = 0;
+do {
+        $attempt += 1;
+        $response = curl_exec($curl);
+        $data = json_decode($response, true);
+        $today = str_replace('+', '', $data['response'][0]['cases']['new']);
+        if((int)$today == 0){
+                echo ("ERR: No data for today");
         } else {
-                $ret = '+' . $today . ' (' . $dif . '), R: ' . $cache['record'];
-                echo($ret . "\n");
-        }
+                $rec = (($cache['record'] < $today) ? $today : $cache['record']);
+                $def = array("today" => $today, "record" => $rec, "date" => date("m/d/y"));
+                $dif = ($today - $cache['today']);
+                if ($dif == 0) {
+                        echo ("WARN: Received same data, retrying in 360 sec\n");
+                        sleep(360);
+                        continue;
+                }
+                if(in_array('-t', $argv)){
+                        $ret = '[CW]: +' . $today . ' \\> ' . $dif . ', R: ' . $cache['record'];
+                        $swret = date("m.d") . ' +' . $today . ' \(' . $dif . '\) R: ' . $cache['record'];
+                        shell_exec("send -SSA-". $swret);
+                        shell_exec("telegrambotreport -m " . $ret);
+                } else {
+                        $ret = '+' . $today . ' (' . $dif . '), R: ' . $cache['record'];
+                        echo($ret . "\n");
+                }
 
-        if(date("m/d/y") != $cache["date"]){
-                file_put_contents($dir . '/cache.json', json_encode($def));
+                if(date("m/d/y") != $cache["date"]){
+                        file_put_contents($dir . '/cache.json', json_encode($def));
+                }
         }
-}
+} while ($dif == 0 && $attempt < 10);
