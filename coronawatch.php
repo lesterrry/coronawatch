@@ -18,7 +18,7 @@ curl_setopt_array($curl, [
         CURLOPT_CUSTOMREQUEST => "GET",
         CURLOPT_HTTPHEADER => [
                 "x-rapidapi-host: covid-193.p.rapidapi.com",
-                "x-rapidapi-key: KEY"
+                "x-rapidapi-key: f75ea1862emsh465457c06e60f97p1769ddjsn5e7db4f0abeb"
         ],
 ]);
 
@@ -34,23 +34,24 @@ do {
                 $rec = (($cache['record'] < $today) ? $today : $cache['record']);
                 $def = array("today" => $today, "record" => $rec, "date" => date("m/d/y"));
                 $dif = ($today - $cache['today']);
-                if ($dif == 0) {
-                        echo ("WARN: Received same data, retrying in 360 sec\n");
-                        sleep(360);
-                        continue;
+                if(date("m/d/y") != $cache["date"]){
+                        file_put_contents($dir . '/cache.json', json_encode($def));
                 }
                 if(in_array('-t', $argv)){
-                        $ret = '[CW]: +' . $today . ' \\> ' . $dif . ', R: ' . $cache['record'];
-                        $swret = date("m.d") . ' +' . $today . ' \(' . $dif . '\) R: ' . $cache['record'];
-                        shell_exec("send -SSA-". $swret);
-                        shell_exec("telegrambotreport -m " . $ret);
+                        if ($dif == 0) {
+                                echo ("WARN: Received same data, retrying in 360 sec\n");
+                                sleep(360);
+                                continue;
+                        } else {
+                                $ret = '[CW]: +' . $today . ' \\> ' . $dif . ', R: ' . $cache['record'];
+                                $swret = date("m.d") . ' +' . $today . ' \(' . $dif . '\) R: ' . $cache['record'];
+                                shell_exec("send -SSA-". $swret);
+                                shell_exec("telegrambotreport " . $ret);
+                        }
                 } else {
                         $ret = '+' . $today . ' (' . $dif . '), R: ' . $cache['record'];
                         echo($ret . "\n");
-                }
-
-                if(date("m/d/y") != $cache["date"]){
-                        file_put_contents($dir . '/cache.json', json_encode($def));
+                        exit(0);
                 }
         }
 } while ($dif == 0 && $attempt < 10);
